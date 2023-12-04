@@ -7,6 +7,18 @@ from conversation import Conversation
 from model_manager import ModelManager
 from style.styles import TextColor
 
+def viewport_y(offset: int = 0):
+    """
+    Returns height relative to viewport height
+    """
+    return dpg.get_viewport_height() + offset
+
+def viewport_x(offset: int = 0):
+    """
+    Used for setting width relative to viewport
+    """
+    return dpg.get_viewport_width() + offset
+
 def set_token_output(value: str):
     """
     Adds incoming tokens to conversation and displays in chat window
@@ -68,7 +80,8 @@ def on_send_inference():
         return
     
     input = dpg.get_value("chat_input_area")
-    conversation.append_full_user_message(input)
+    if input is not None and input != "":
+        conversation.append_full_user_message(input)
     display_text = conversation.get_string_for_display()
     dpg.set_value("chat_output_area", display_text)
     input_string = conversation.get_string_for_inference()
@@ -87,7 +100,7 @@ def on_select_model(sender):
     global selected_model
     selected_model = dpg.get_value(sender)
     llm_process_manager.set_model(selected_model)
-    dpg.configure_item("max_tokens_slider", max_value=llm_process_manager.max_context_length)
+    dpg.configure_item("max_tokens_slider", max_value=get_max_token_slider_limit())
 
 def on_set_device_map(sender):
     """
@@ -100,7 +113,7 @@ def on_set_device_map(sender):
         llm_process_manager.device_map = "cuda"
     elif selected_device == "CPU":
         llm_process_manager.device_map = "cpu"
-    elif selected_device == "Apple M":
+    elif selected_device == "MPS":
         llm_process_manager.device_map = "mps"
 
 def on_set_temperature(sender):
@@ -114,6 +127,15 @@ def on_set_top_k(sender):
 
 def on_set_max_tokens(sender):
     llm_process_manager.max_new_tokens = dpg.get_value(sender)
+
+def get_max_token_slider_limit():
+    """
+    Determines the max value for the max tokens slider
+    """
+    max_context_length = llm_process_manager.max_context_length
+    if max_context_length is int:
+        return max_context_length
+    return 4096
 
 def on_set_system_prompt():
     """
@@ -156,6 +178,30 @@ def on_show_raw_output(sender):
     Toggle raw conversation string in chat output
     """
     conversation.show_raw_output = dpg.get_value(sender)
+    display_text = conversation.get_string_for_display()
+    dpg.set_value("chat_output_area", display_text)
+
+def on_reset_conversation():
+    """
+    Reset conversation history and display
+    """
+    conversation.reset_conversation()
+    display_text = conversation.get_string_for_display()
+    dpg.set_value("chat_output_area", display_text)
+
+def on_remove_last_message():
+    """
+    Remove last message from conversation history and display
+    """
+    conversation.remove_last_message()
+    display_text = conversation.get_string_for_display()
+    dpg.set_value("chat_output_area", display_text)
+
+def on_set_line_width(sender):
+    """
+    Set line width for chat output
+    """
+    conversation.line_width = dpg.get_value(sender)
     display_text = conversation.get_string_for_display()
     dpg.set_value("chat_output_area", display_text)
 
@@ -211,16 +257,16 @@ conversation = Conversation(system_prompt="You are a helpful AI that follows all
                             instruction_end_string="[/INST]")
 
 llm_process_manager = ModelManager(model=selected_model, 
-                                        device_map="cuda",
-                                        temperature=0.2,
-                                        top_p=0.99,
-                                        top_k=250,
-                                        max_new_tokens=128,
-                                        inference_speed_callback=set_inference_speed_info,
-                                        context_length_callback=set_context_length_info,
-                                        token_output_callback=set_token_output,
-                                        model_loaded_callback=on_done_loading_model,
-                                        model_unloaded_callback=on_done_unloading_model)
+                                   device_map="cuda",
+                                   temperature=0.2,
+                                   top_p=0.99,
+                                   top_k=250,
+                                   max_new_tokens=128,
+                                   inference_speed_callback=set_inference_speed_info,
+                                   context_length_callback=set_context_length_info,
+                                   token_output_callback=set_token_output,
+                                   model_loaded_callback=on_done_loading_model,
+                                    model_unloaded_callback=on_done_unloading_model)
 
 if __name__ == "__main__":
     dpg.create_context()
@@ -239,6 +285,8 @@ if __name__ == "__main__":
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (78, 78, 78), category=dpg.mvThemeCat_Core)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (78, 78, 78), category=dpg.mvThemeCat_Core)
 
+            dpg.add_theme_color(dpg.mvThemeCol_WindowBg, (27, 27, 28), category=dpg.mvThemeCat_Core)
+            dpg.add_theme_color(dpg.mvThemeCol_ChildBg, (27, 27, 28), category=dpg.mvThemeCat_Core)
             dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (37, 37, 38), category=dpg.mvThemeCat_Core)
             dpg.add_theme_style(dpg.mvPlotStyleVar_PlotPadding, 0, 0, category=dpg.mvThemeCat_Plots)
             dpg.add_theme_color(dpg.mvThemeCol_TabActive, (78, 78, 78), category=dpg.mvThemeCat_Core)
@@ -248,10 +296,42 @@ if __name__ == "__main__":
             dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 8, category=dpg.mvThemeCat_Core)
 
         with dpg.theme_component(dpg.mvButton, enabled_state=False):
-            dpg.add_theme_color(dpg.mvThemeCol_Text, (151, 151, 151), category=dpg.mvThemeCat_Core)
+            dpg.add_theme_color(dpg.mvThemeCol_Text, (131, 131, 131), category=dpg.mvThemeCat_Core)
             dpg.add_theme_color(dpg.mvThemeCol_Button, (47, 47, 48), category=dpg.mvThemeCat_Core)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (47, 47, 48), category=dpg.mvThemeCat_Core)
             dpg.add_theme_color(dpg.mvThemeCol_ButtonActive, (47, 47, 48), category=dpg.mvThemeCat_Core)
+    
+    with dpg.theme() as label_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 8, 1, category=dpg.mvThemeCat_Core)
+
+    with dpg.theme() as settings_tab_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (57, 57, 58), category=dpg.mvThemeCat_Core)
+
+    # with dpg.theme() as slider_theme:
+    #     with dpg.theme_component(dpg.mvAll):
+    #         dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 4, 1, category=dpg.mvThemeCat_Core)
+
+    with dpg.theme() as data_group_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 4, 4, category=dpg.mvThemeCat_Core)
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (27, 27, 28), category=dpg.mvThemeCat_Core)
+            
+    with dpg.theme() as inference_stats_group_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 8, 5, category=dpg.mvThemeCat_Core)
+
+    with dpg.theme() as text_input_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (57, 57, 58), category=dpg.mvThemeCat_Core)
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 6, 5, category=dpg.mvThemeCat_Core)
+
+    with dpg.theme() as second_column_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (57, 57, 58), category=dpg.mvThemeCat_Core)
+            dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, (151, 151, 151), category=dpg.mvThemeCat_Core)
+            dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, (20 , 119, 200, 230), category=dpg.mvThemeCat_Core)
 
     dpg.bind_theme(global_theme)
     dpg.bind_font(default_font)
@@ -259,13 +339,14 @@ if __name__ == "__main__":
     with dpg.window(tag="primary_window", width=1350, height=-1) as window:
         with dpg.group(horizontal=True) as primary_group:
             # FIRST COLUMN
-            with dpg.child_window(width=968, height=-1, border=False):
+            with dpg.child_window(width=-346, height=-1, border=False):
                 with dpg.child_window(tag="plots", height=60):
-                    with dpg.group(horizontal=True):
+                    with dpg.group(horizontal=True) as data_group:
+                        dpg.bind_item_theme(data_group, data_group_theme)
                         # LOGO
-                        with dpg.group() as group:
-                            dpg.add_text(f" Facade v0.1 ", pos=(6, 18))
-                            dpg.bind_item_font(group, logo_font)
+                        with dpg.child_window(width=-806, height=44) as logo_window:
+                            dpg.add_text(f" Facade v0.1 ", pos=(6, 10))
+                            dpg.bind_item_font(logo_window, logo_font)
 
                         # GPU UTILIZATION PLOT
                         with dpg.plot(height=44, width=197) as gpu_utilization_plot:
@@ -316,13 +397,9 @@ if __name__ == "__main__":
                             dpg.add_line_series(plot_x_time, cpu_y_memory, parent="cpu_memory_y_axis", tag="cpu_memory")
 
                 # INFO BLOCK GROUP
-                with dpg.group(horizontal=True) as info_block_group:
-                    with dpg.theme() as info_block_theme:
-                        with dpg.theme_component(dpg.mvAll):
-                                dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 8, 5, category=dpg.mvThemeCat_Core)
-
+                with dpg.group(horizontal=True) as inference_stats_group:
                     # SYSTEM MESSAGE DISPLAY
-                    with dpg.child_window(width=480, height=30):
+                    with dpg.child_window(width=-488, height=30):
                         with dpg.group(horizontal=True):
                             dpg.add_text(tag="system_message_display", default_value="No model loaded.", color=TextColor.RED.value)
 
@@ -336,76 +413,82 @@ if __name__ == "__main__":
                         with dpg.group(horizontal=True):
                             dpg.add_text(tag="context_length_info", default_value="Context: -/- tokens")
 
-                    dpg.bind_item_theme(info_block_group, info_block_theme)
+                    dpg.bind_item_theme(inference_stats_group, inference_stats_group_theme)
 
                 # TABS
                 with dpg.tab_bar() as tabs:
-                    with dpg.theme() as text_input_theme:
-                            with dpg.theme_component(dpg.mvAll):
-                                    dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (57, 57, 58), category=dpg.mvThemeCat_Core)
-
                     # CHAT TAB
                     with dpg.tab(label="Chat"):
                         # OUTPUT AREA
                         with dpg.child_window(tag="chat_output_window", autosize_x=False, height=-48): 
-                            dpg.add_input_text(tag="chat_output_area",  multiline=True, readonly=True, tracked=True, track_offset=1.0, height=-14, width=-2)
-                            dpg.add_spacer(height=5)
+                            dpg.add_input_text(tag="chat_output_area",  multiline=True, readonly=True, tracked=True, track_offset=1.0, height=-2, width=-2)
 
                         # INPUT AREA
                         with dpg.child_window(tag="chat_input_window", height=40):
-                            with dpg.group(horizontal=True):
-                                dpg.add_input_text(tag="chat_input_area", multiline=False, on_enter=True, height=-1, width=-90, callback=on_send_inference)
+                            with dpg.group(horizontal=True) as input_area:
+                                dpg.bind_item_theme(input_area, text_input_theme)
+                                dpg.add_input_text(tag="chat_input_area", multiline=False, on_enter=True, height=-2, width=-90, callback=on_send_inference)
                                 dpg.add_button(label="Inference", tag="inference_btn", callback=on_send_inference, width=80, height=-1, enabled=False)
-                                dpg.bind_item_theme("chat_input_area", text_input_theme)
 
                     # SETTINGS TAB
-                    with dpg.tab(label="Chat settings") as settings_tab:
-                        with dpg.child_window(height=-8):
+                    with dpg.tab(label="Prompt settings") as settings_tab:
+                        dpg.bind_item_theme(settings_tab, settings_tab_theme)
+                        with dpg.child_window(height=-4):
                             dpg.add_text(default_value="System prompt")
                             with dpg.group(horizontal=True):
                                     dpg.add_input_text(tag="system_prompt_input", multiline=True, height=80, width=-90, default_value=conversation.get_system_prompt())
                                     dpg.add_button(label="Set", width=80, height=80, callback=on_set_system_prompt)
-                            
-                            dpg.add_separator()
-                            with dpg.group():
-                                dpg.add_checkbox(label="Show system prompt", default_value=True, callback=on_show_system_prompt)
-                                dpg.add_checkbox(label="Use multiline input", default_value=False, callback=on_use_multiline_input)
-                                dpg.add_checkbox(label="Show raw output", default_value=False, callback=on_show_raw_output)
-                                # TODO: button to clear conversation
-                    dpg.bind_item_theme(settings_tab, text_input_theme)
+                                    # TODO: input wrapper settings
+                                    # TODO: newline settings
 
             # SECOND COLUMN
-            with dpg.child_window(tag="hyperparameters_window", autosize_x=True, height=-1) as hyperparameters_window:
-                with dpg.theme() as hyperparameters_theme:
-                        with dpg.theme_component(dpg.mvAll):
-                                dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (57, 57, 58), category=dpg.mvThemeCat_Core)
-                                dpg.add_theme_color(dpg.mvThemeCol_SliderGrabActive, (151, 151, 151), category=dpg.mvThemeCat_Core)
-                                dpg.add_theme_color(dpg.mvThemeCol_SliderGrab, (20 , 119, 200, 230), category=dpg.mvThemeCat_Core)
+            with dpg.group() as second_column:
+                dpg.bind_item_theme(second_column, second_column_theme)
 
-                # MODEL LOADING
-                dpg.add_combo(default_value=selected_model, items=downloaded_models, width=-10, callback=on_select_model)
-                with dpg.group(horizontal=True):
-                    dpg.add_text("Device map:")
-                    dpg.add_radio_button(label="device_map", items=['Auto', 'GPU', 'CPU', 'Apple M'], horizontal=True, default_value='GPU', callback=on_set_device_map)
-                    # TODO: Add load_in_8bit option
-                    # TODO: Add low_cpu_memory_usage option
+                with dpg.child_window(tag="hyperparameters_window", width=340, height=-174) as hyperparameters_window:
+                    # MODEL LOADING
+                    dpg.add_combo(default_value=selected_model, items=downloaded_models, width=-10, callback=on_select_model)
+                    with dpg.group(horizontal=True):
+                        dpg.add_text("Device map:")
+                        dpg.add_radio_button(label="device_map", items=['Auto', 'GPU', 'CPU', 'MPS'], horizontal=True, default_value='GPU', callback=on_set_device_map)
+                        # TODO: Add load_in_8bit option
+                        # TODO: Add low_cpu_memory_usage option
 
-                with dpg.group(horizontal=True):
-                    dpg.add_button(label="Load model", tag="load_model_btn", width=155, callback=on_load_model, enabled=True)
-                    dpg.add_button(label="Unload model", tag="unload_model_btn", width=155, callback=on_unload_model, enabled=False)
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(label="Load model", tag="load_model_btn", width=155, callback=on_load_model, enabled=True)
+                        dpg.add_button(label="Unload model", tag="unload_model_btn", width=155, callback=on_unload_model, enabled=False)
 
-                # HYPERPARAMETERS
-                dpg.add_separator()
-                with dpg.group():
-                    dpg.add_text("Temperature")
-                    dpg.add_slider_float(callback=on_set_temperature, tracked=True, default_value=0.2, min_value=0.0, max_value=2.0, width=-10)
-                    dpg.add_text("Top P")
-                    dpg.add_slider_float(callback=on_set_top_p, tracked=True, default_value=0.99, min_value=0.00, max_value=1.00, width=-10)
-                    dpg.add_text("Top K")
-                    dpg.add_slider_int(callback=on_set_top_k, tracked=True, default_value=250, min_value=0, max_value=1000, width=-10)
-                    dpg.add_text("Max tokens to generate")
-                    dpg.add_slider_int(tag="max_tokens_slider", callback=on_set_max_tokens, tracked=True, default_value=128, min_value=0, max_value=llm_process_manager.max_context_length, width=-10)
-                dpg.bind_item_theme(hyperparameters_window, hyperparameters_theme)
+                    # HYPERPARAMETERS
+                    dpg.add_separator()
+                    with dpg.group() as hyperparameters_group:
+                        temp_label = dpg.add_text("Temperature")
+                        dpg.bind_item_theme(temp_label, label_theme)
+                        dpg.add_slider_float(callback=on_set_temperature, tracked=True, default_value=0.2, min_value=0.0, max_value=2.0, width=-4)
+                        top_p_label = dpg.add_text("Top P")
+                        dpg.bind_item_theme(top_p_label, label_theme)
+                        dpg.add_slider_float(callback=on_set_top_p, tracked=True, default_value=0.99, min_value=0.00, max_value=1.00, width=-4)
+                        top_k_label = dpg.add_text("Top K")
+                        dpg.bind_item_theme(top_k_label, label_theme)
+                        dpg.add_slider_int(callback=on_set_top_k, tracked=True, default_value=250, min_value=0, max_value=1000, width=-4)
+                        max_tokens_label = dpg.add_text("Max tokens to generate")
+                        dpg.bind_item_theme(max_tokens_label, label_theme)
+                        dpg.add_slider_int(tag="max_tokens_slider", callback=on_set_max_tokens, tracked=True, default_value=128, min_value=0, max_value=get_max_token_slider_limit(), width=-4)
+                    dpg.add_separator()
+
+                # CHAT SETTINGS
+                with dpg.child_window(height=166):
+                    with dpg.group(horizontal=True):
+                        dpg.add_button(label="Remove last message", width=155, callback=on_remove_last_message)
+                        dpg.add_button(label="Reset conversation", width=155, callback=on_reset_conversation)
+
+                    line_width_label = dpg.add_text("Line width")
+                    dpg.bind_item_theme(line_width_label, label_theme)
+                    dpg.add_slider_int(callback=on_set_line_width, tracked=True, default_value=conversation.line_width, min_value=50, max_value=300, width=-4)
+                    dpg.add_checkbox(label="Show system prompt", default_value=conversation.show_system_prompt, callback=on_show_system_prompt)
+                    dpg.add_checkbox(label="Use multiline input", default_value=False, callback=on_use_multiline_input)
+                    dpg.add_checkbox(label="Show raw output", default_value=conversation.show_raw_output, callback=on_show_raw_output)
+                        # TODO: Manual edit mode
+                
         
     gpu_stats_thread = threading.Thread(target=update_system_utilization)
     gpu_stats_thread.daemon = True
@@ -413,7 +496,7 @@ if __name__ == "__main__":
 
     dpg.setup_dearpygui()
     dpg.show_viewport()
-    # dpg.show_style_editor()
+    dpg.show_style_editor()
     dpg.set_primary_window("primary_window", True)
     dpg.start_dearpygui()
 

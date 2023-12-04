@@ -86,9 +86,7 @@ class ModelManager():
         self.model_loaded_callback = model_loaded_callback
         self.model_unloaded_callback = model_unloaded_callback
         
-        with open(os.path.join(self.model_dir, "config.json"), 'r') as model_config:
-            data = json.load(model_config)
-            self.max_context_length = data.get("sliding_window", None)
+        self.max_context_length = self.check_max_context_length()
 
         self.model_process = None
         self.model_ready_event = mp.Event()
@@ -98,6 +96,16 @@ class ModelManager():
         self.output_queue = mp.Queue()
 
         self.output_started = False
+
+    def check_max_context_length(self):
+         with open(os.path.join(self.model_dir, "config.json"), 'r') as model_config:
+            data = json.load(model_config)
+            if "sliding_window" in data:
+                return data.get("sliding_window", None)
+            if "max_length" in data:
+                return data.get("max_length", None)
+            else:
+                return "?"
 
     def run_inference(self, text):
         """
@@ -168,8 +176,6 @@ class ModelManager():
         """
         Sets the model directory, and checks the config.json for the max context length
         """
-        self.model_dir = os.path.join("models", model, "config.json")
-        with open(self.model_dir, 'r') as model_config:
-            data = json.load(model_config)
-            self.max_context_length = data.get("sliding_window", None)
+        self.model_dir = os.path.join("models", model)
+        self.max_context_length = self.check_max_context_length()
 
