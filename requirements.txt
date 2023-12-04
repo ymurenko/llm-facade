@@ -1,0 +1,7 @@
+transformers==4.34.0
+auto-gptq==0.5.1
+accelerate==0.24.1
+optimum==1.14.1
+huggingface-hub==0.17.3
+dearpygui==1.10.1
+numba==0.58.1
