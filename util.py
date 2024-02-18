@@ -9,6 +9,9 @@ def get_system_info():
     return cpu_name, cpu_max_memory, gpu_name, gpu_max_memory
 
 def get_cpu_info():
+    """
+    Returns CPU name and total system memory
+    """
     os_name = platform.system()
     cpu_name = ""
     if os_name == "Windows":
@@ -33,6 +36,9 @@ def get_cpu_info():
     return cpu_name, cpu_max_memory
 
 def get_cpu_usage():
+    """
+    Returns current (system-wide) CPU utilization and memory usage
+    """
     memory_usage_bytes = psutil.virtual_memory().used
     cpu_memory_used = memory_usage_bytes / (1024 ** 3)
     cpu_utilization = psutil.cpu_percent(interval=1)
@@ -40,6 +46,9 @@ def get_cpu_usage():
     return cpu_utilization, cpu_memory_used
     
 def get_gpu_info():
+    """
+    Returns GPU name and total GPU memory
+    """
     result = subprocess.run(['nvidia-smi', '--query-gpu=name,memory.total', '--format=csv,noheader,nounits'], stdout=subprocess.PIPE)
     output = result.stdout.decode('utf-8').strip().split('\n')
     gpu_stats = [line.split(', ') for line in output]
@@ -49,6 +58,9 @@ def get_gpu_info():
     return gpu_name, gpu_max_memory
 
 def get_gpu_usage():
+    """
+    Returns current (system-wide) GPU name and memory usage
+    """
     try:
         result = subprocess.run(['nvidia-smi', '--query-gpu=utilization.gpu,memory.used,memory.total', '--format=csv,noheader,nounits'], stdout=subprocess.PIPE)
         output = result.stdout.decode('utf-8').strip().split('\n')

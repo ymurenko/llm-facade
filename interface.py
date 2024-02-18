@@ -3,9 +3,43 @@ import threading
 import time
 import dearpygui.dearpygui as dpg
 from util import get_gpu_usage, get_cpu_usage, get_system_info
-from conversation import Conversation
+from conversation import Conversation, wrap_text
 from model_manager import ModelManager
 from style.styles import TextColor
+
+num_messages = 0
+
+def render_chat_messages():
+    dpg.set_value("raw_output_area", conversation.get_raw_string_for_display())
+    dpg.delete_item(output_area, children_only=True)
+
+    for message in conversation.conversation_history:
+        content = str(message["content"])
+        formatted_content = wrap_text(content, conversation.line_width)
+        role = message["role"]
+        height = 30 + (formatted_content.count('\n') * 13)
+        if role == "user":
+            with dpg.group(horizontal=True, parent=output_area):
+                dpg.add_text("User:")
+                user_message = dpg.add_input_text(default_value=formatted_content, multiline=True, readonly=True, height=height, width=-2)
+                dpg.bind_item_theme(user_message, user_message_theme)
+        elif role == "ai":
+            with dpg.group(horizontal=True, parent=output_area):
+                dpg.add_text("  AI:")
+                ai_mesasge = dpg.add_input_text(default_value=formatted_content, multiline=True, readonly=True, height=height, width=-2)
+                dpg.bind_item_theme(ai_mesasge, ai_message_theme)
+
+def render_streamed_ai_message():
+    children = dpg.get_item_children(output_area, slot=1)
+    dpg.set_value("raw_output_area", conversation.get_raw_string_for_display())
+    if len(children) == len(conversation.conversation_history) - 1:
+        text_area = dpg.get_item_children(children[-1], slot=1)[-1]
+        content = str(conversation.get_last_ai_message())
+        formatted_content = wrap_text(content, conversation.line_width)
+        height = 30 + (formatted_content.count('\n') * 13)
+        dpg.configure_item(text_area, default_value=formatted_content, height=height)
+    else:
+        render_chat_messages()
 
 def viewport_y(offset: int = 0):
     """
@@ -24,8 +58,7 @@ def set_token_output(value: str):
     Adds incoming tokens to conversation and displays in chat window
     """
     conversation.append_partial_ai_message(value)
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
+    render_streamed_ai_message()
 
 def set_inference_speed_info(value: float):
     """
@@ -82,8 +115,7 @@ def on_send_inference():
     input = dpg.get_value("chat_input_area")
     if input is not None and input != "":
         conversation.append_full_user_message(input)
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
+    render_chat_messages()
     input_string = conversation.get_string_for_inference()
     dpg.set_value("chat_input_area", "")
     dpg.configure_item("inference_btn", enabled=False)
@@ -143,22 +175,13 @@ def on_set_system_prompt():
     """
     system_prompt = dpg.get_value("system_prompt_input")
     conversation.set_system_prompt(system_prompt)
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
+    render_chat_messages()
 
 def set_system_message(message: str, color: TextColor):
     """
     Sets system info message and color
     """
     dpg.configure_item("system_message_display", default_value=message, color=color.value)
-
-def on_show_system_prompt(sender):
-    """
-    Toggle whether to show the system prompt in chat output
-    """
-    conversation.show_system_prompt = dpg.get_value(sender)
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
 
 def on_use_multiline_input(sender):
     """
@@ -173,37 +196,26 @@ def on_use_multiline_input(sender):
         dpg.configure_item("chat_input_window", height=40)
         dpg.configure_item("chat_output_window", height=-48)
 
-def on_show_raw_output(sender):
-    """
-    Toggle raw conversation string in chat output
-    """
-    conversation.show_raw_output = dpg.get_value(sender)
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
-
 def on_reset_conversation():
     """
     Reset conversation history and display
     """
     conversation.reset_conversation()
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
+    render_chat_messages()
 
 def on_remove_last_message():
     """
     Remove last message from conversation history and display
     """
     conversation.remove_last_message()
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
+    render_chat_messages()
 
 def on_set_line_width(sender):
     """
     Set line width for chat output
     """
     conversation.line_width = dpg.get_value(sender)
-    display_text = conversation.get_string_for_display()
-    dpg.set_value("chat_output_area", display_text)
+    render_chat_messages()
 
 def update_system_utilization():
     """
@@ -313,6 +325,14 @@ if __name__ == "__main__":
     #     with dpg.theme_component(dpg.mvAll):
     #         dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 4, 1, category=dpg.mvThemeCat_Core)
 
+    with dpg.theme() as user_message_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (27, 27, 28), category=dpg.mvThemeCat_Core)
+
+    with dpg.theme() as ai_message_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_color(dpg.mvThemeCol_FrameBg, (37, 37, 38), category=dpg.mvThemeCat_Core)
+
     with dpg.theme() as data_group_theme:
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_style(dpg.mvStyleVar_ItemSpacing, 4, 4, category=dpg.mvThemeCat_Core)
@@ -321,6 +341,10 @@ if __name__ == "__main__":
     with dpg.theme() as inference_stats_group_theme:
         with dpg.theme_component(dpg.mvAll):
             dpg.add_theme_style(dpg.mvStyleVar_WindowPadding, 8, 5, category=dpg.mvThemeCat_Core)
+
+    with dpg.theme() as output_area_theme:
+        with dpg.theme_component(dpg.mvAll):
+            dpg.add_theme_style(dpg.mvStyleVar_FramePadding, 10, 8, category=dpg.mvThemeCat_Core)
 
     with dpg.theme() as text_input_theme:
         with dpg.theme_component(dpg.mvAll):
@@ -420,8 +444,8 @@ if __name__ == "__main__":
                     # CHAT TAB
                     with dpg.tab(label="Chat"):
                         # OUTPUT AREA
-                        with dpg.child_window(tag="chat_output_window", autosize_x=False, height=-48): 
-                            dpg.add_input_text(tag="chat_output_area",  multiline=True, readonly=True, tracked=True, track_offset=1.0, height=-2, width=-2)
+                        with dpg.child_window(tag="chat_output_window", autosize_x=False, height=-48) as output_area: 
+                            dpg.bind_item_theme(output_area, output_area_theme)
 
                         # INPUT AREA
                         with dpg.child_window(tag="chat_input_window", height=40):
@@ -429,6 +453,17 @@ if __name__ == "__main__":
                                 dpg.bind_item_theme(input_area, text_input_theme)
                                 dpg.add_input_text(tag="chat_input_area", multiline=False, on_enter=True, height=-2, width=-90, callback=on_send_inference)
                                 dpg.add_button(label="Inference", tag="inference_btn", callback=on_send_inference, width=80, height=-1, enabled=False)
+                    # RAW TAB
+                    with dpg.tab(label="Raw"):
+                        with dpg.child_window(autosize_x=False, height=-48): 
+                            dpg.add_input_text(tag="raw_output_area",  multiline=True, readonly=False, tracked=True, track_offset=1.0, height=-2, width=-2)
+
+                        # INPUT AREA
+                        with dpg.child_window(height=40):
+                            with dpg.group(horizontal=True) as raw_input_area:
+                                dpg.bind_item_theme(raw_input_area, text_input_theme)
+                                dpg.add_spacer(height=-2, width=-90)
+                                dpg.add_button(label="Inference", width=80, height=-1, enabled=False)
 
                     # SETTINGS TAB
                     with dpg.tab(label="Prompt settings") as settings_tab:
@@ -445,7 +480,7 @@ if __name__ == "__main__":
             with dpg.group() as second_column:
                 dpg.bind_item_theme(second_column, second_column_theme)
 
-                with dpg.child_window(tag="hyperparameters_window", width=340, height=-174) as hyperparameters_window:
+                with dpg.child_window(tag="hyperparameters_window", width=340, height=-119) as hyperparameters_window:
                     # MODEL LOADING
                     dpg.add_combo(default_value=selected_model, items=downloaded_models, width=-10, callback=on_select_model)
                     with dpg.group(horizontal=True):
@@ -476,17 +511,15 @@ if __name__ == "__main__":
                     dpg.add_separator()
 
                 # CHAT SETTINGS
-                with dpg.child_window(height=166):
+                with dpg.child_window(height=110):
                     with dpg.group(horizontal=True):
                         dpg.add_button(label="Remove last message", width=155, callback=on_remove_last_message)
                         dpg.add_button(label="Reset conversation", width=155, callback=on_reset_conversation)
 
-                    line_width_label = dpg.add_text("Line width")
+                    dpg.add_checkbox(label="Use multiline input", default_value=False, callback=on_use_multiline_input)
+                    line_width_label = dpg.add_text("Output line width")
                     dpg.bind_item_theme(line_width_label, label_theme)
                     dpg.add_slider_int(callback=on_set_line_width, tracked=True, default_value=conversation.line_width, min_value=50, max_value=300, width=-4)
-                    dpg.add_checkbox(label="Show system prompt", default_value=conversation.show_system_prompt, callback=on_show_system_prompt)
-                    dpg.add_checkbox(label="Use multiline input", default_value=False, callback=on_use_multiline_input)
-                    dpg.add_checkbox(label="Show raw output", default_value=conversation.show_raw_output, callback=on_show_raw_output)
                         # TODO: Manual edit mode
                 
         

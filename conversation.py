@@ -85,25 +85,30 @@ class Conversation:
 
         return input_string
     
+    def get_raw_string_for_display(self):
+        output = ""
+        for message in self.conversation_history:
+            output += wrap_text(message["content"], width=self.line_width) + "\n\n"
+
+        return output
+    
+    def get_last_ai_message(self):
+        """
+        Returns the last AI message in the conversation history
+        """
+        for message in reversed(self.conversation_history):
+            if message["role"] == "ai":
+                return message["content"]
+
     def get_string_for_display(self):
         """
-        Parses conversation history into a neat string to display
-        in the interface's chat output area, returns raw string if
-        show_raw_output is set using the chekcbox in the interface
+        Parses conversation history into a neat string
         """
-        output_string = ""
-        
-        if self.show_raw_output:
-            output_string = self.get_string_for_inference()
+        output = []
+        for message in self.conversation_history:
+            if message["role"] == "user":
+                output.append("<USER>: " + wrap_text(message["content"], width=self.line_width))
+            elif message["role"] == "ai":
+                output.append("<AI>: " + wrap_text(message["content"], width=self.line_width))
 
-        else:
-            if(self.show_system_prompt):
-                output_string = "<SYSTEM INSTRUCTIONS>: " + wrap_text(self.conversation_history[0]["content"], width=self.line_width) + "\n\n"
-
-            for message in self.conversation_history:
-                if message["role"] == "user":
-                    output_string += "<USER>: " + wrap_text(message["content"], width=self.line_width) + "\n\n"
-                elif message["role"] == "ai":
-                    output_string += "<AI>: " + wrap_text(message["content"], width=self.line_width) + "\n\n"
-
-        return output_string
+        return output
