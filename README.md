@@ -1,15 +1,15 @@
 # llm-facade
-A python-based data rich text generation UI for inferencing large language models, built using [transformers](https://pypi.org/project/transformers/) and [dearpygui](https://pypi.org/project/dearpygui/).
+A python-based text generation app for inferencing large language models, built using [transformers](https://pypi.org/project/transformers/) and [dearpygui](https://pypi.org/project/dearpygui/).
 
 https://github.com/ymurenko/llm-facade/assets/44625754/1ac30b36-ac89-4c5d-ba42-b6dc60e094e6
 
-## Purpose
+I've been working with LLMs a lot lately, so I decided to make myself a little app to run a local conversational inference with any of the popular LLMs hosted on hugging face. While projects like [text-generation-webui](https://github.com/oobabooga/text-generation-webui) and [gradio](https://github.com/gradio-app/gradio) are a lot more polished and practical (I built llm-facade v0.1 over a couple weekends lol), they happen to use a web-browser and a modern UI. I want a standalone app that looks and feels a bit more old-school, with a data-rich UI :sunglasses:
 
-I wanted to make myself an alternative to [text-generation-webui](https://github.com/oobabooga/text-generation-webui) that runs as a standalone desktop application instead of a web browser. I also wanted to be able to track things like tokens per second, context length limits, and monitor system resources - all within a single compact UI. 
+Very much a small side project, so it needs a bit more polish as well as testing with different models and system configurations. 
 
 ## Features
 
-- Load most LLMs hosted on [Hugging Face](https://huggingface.co/)
+- Locally load and inference LLMs hosted on [Hugging Face](https://huggingface.co/)
   - Tested with `Mistral-7B-instruct` and `Llama-2-13B` 
 - Chat UI with token streaming
 - View raw LLM input/output string
@@ -21,9 +21,9 @@ I wanted to make myself an alternative to [text-generation-webui](https://github
 
 ## Compatability
 
-- Currently supports any language models found on Hugging Face that use the `AutoModelForCausalLM` class (transformers <= 4.34.0).
+- Supports most language models found on Hugging Face that use the `AutoModelForCausalLM` class and require transformers <= 4.34.0.
 - Tested and working on Windows 10, should work on Linux and MacOS
-  - Includes option to use Apple silicon for inference
+  - Includes option to select Apple silicon for model inference, but I haven't tested it so beware of crashes
 
  ## Requirements
 
